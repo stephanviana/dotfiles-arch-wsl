@@ -7,7 +7,7 @@ set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TOOLS_DIR="$DOTFILES_DIR/wsl/tools"
-TOTAL_STEPS=9
+TOTAL_STEPS=10
 STEP=0
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -42,11 +42,11 @@ echo "║                                                                    ║
 echo "╚══════════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# ── [1/9] Rede e DNS ────────────────────────────────────────────────────────
+# ── [1/10] Rede e DNS ───────────────────────────────────────────────────────
 step "🌐 Configurando rede e DNS..."
 run_tool "network.sh"
 
-# ── [2/9] Atualizar sistema e dependências base via Pacman ──────────────────
+# ── [2/10] Atualizar sistema e dependências base via Pacman ─────────────────
 step "📦 Atualizando sistema e instalando pacotes base via Pacman..."
 echo "   → Atualizando base de pacotes..."
 sudo pacman -Sy --needed --noconfirm archlinux-keyring || true
@@ -67,23 +67,27 @@ if command -v archlinux-java &>/dev/null; then
     sudo archlinux-java set java-17-openjdk 2>/dev/null || true
 fi
 
-# ── [3/9] Linguagens via asdf ────────────────────────────────────────────────
+# ── [3/10] Linguagens via asdf ───────────────────────────────────────────────
 step "🔀 Instalando linguagens via asdf (Node, Ruby, Python, Kotlin)..."
 run_tool "asdf.sh"
 
-# ── [4/9] Docker Engine ─────────────────────────────────────────────────────
+# ── [4/10] Docker Engine ────────────────────────────────────────────────────
 step "🐳 Instalando Docker Engine..."
 run_tool "docker.sh"
 
-# ── [5/9] Android ADB bridge ────────────────────────────────────────────────
+# ── [5/10] Android ADB bridge ───────────────────────────────────────────────
 step "📱 Configurando Android ADB bridge..."
 run_tool "android.sh"
 
-# ── [6/9] CLI Tools ─────────────────────────────────────────────────────────
+# ── [6/10] CLI Tools ────────────────────────────────────────────────────────
 step "🔧 Instalando CLI tools..."
 run_tool "cli-tools.sh"
 
-# ── [7/9] Symlinks ──────────────────────────────────────────────────────────
+# ── [7/10] agentmemory ──────────────────────────────────────────────────────
+step "🧠 Configurando agentmemory (memória persistente para IA)..."
+run_tool "agentmemory.sh"
+
+# ── [8/10] Symlinks ─────────────────────────────────────────────────────────
 step "🔗 Criando symlinks..."
 
 create_symlink() {
@@ -102,7 +106,7 @@ create_symlink "$DOTFILES_DIR/wsl/.gitconfig" "$HOME/.gitconfig"
 
 echo "✅ Symlinks criados!"
 
-# ── [8/9] Configurar Zsh como shell padrão ──────────────────────────────────
+# ── [9/10] Configurar Zsh como shell padrão ─────────────────────────────────
 step "🐚 Configurando Zsh..."
 ZSH_BIN="$(command -v zsh || echo '/bin/zsh')"
 if [ "$SHELL" != "$ZSH_BIN" ]; then
@@ -117,7 +121,7 @@ else
     echo "   → Zsh já é o shell padrão."
 fi
 
-# ── [9/9] Resumo final ──────────────────────────────────────────────────────
+# ── [10/10] Resumo final ─────────────────────────────────────────────────────
 step "✅ Ambiente pronto!"
 
 echo "╔══════════════════════════════════════════════════════════════════════╗"
@@ -130,6 +134,7 @@ echo "║  ✅ asdf + Node.js, Ruby, Python, Kotlin                            �
 echo "║  ✅ Docker Engine + Compose nativo (systemd)                       ║"
 echo "║  ✅ Android ADB bridge + scrcpy                                    ║"
 echo "║  ✅ CLI tools (zsh, fzf, ripgrep, zoxide, gh, jq, agy, opencode...) ║"
+echo "║  ✅ agentmemory configurado (systemd user, porta 3111/3113)        ║"
 echo "║  ✅ Symlinks (.zshrc, .gitconfig)                                  ║"
 echo "║  ✅ Zsh como shell padrão                                          ║"
 echo "║                                                                    ║"
@@ -137,6 +142,9 @@ echo "╠═══════════════════════�
 echo "║                                                                    ║"
 echo "║  👉 Próximo passo: reinicie o terminal ou rode:                    ║"
 echo "║     exec zsh                                                       ║"
+echo "║                                                                    ║"
+echo "║  👉 Visualizador do agentmemory no navegador:                      ║"
+echo "║     http://localhost:3113                                          ║"
 echo "║                                                                    ║"
 echo "║  👉 Para Docker sem sudo, faça logout/login ou rode:               ║"
 echo "║     newgrp docker                                                  ║"

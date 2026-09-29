@@ -109,6 +109,17 @@ alias reload="exec zsh"
 alias dotfiles="cd ~/.dotfiles"
 
 # ---------------------------------------------------------------------------
+# agentmemory (https://github.com/rohitg00/agentmemory)
+# ---------------------------------------------------------------------------
+export AGENTMEMORY_URL="http://localhost:3111"
+
+alias mem="agentmemory"
+alias memstatus="curl -s http://localhost:3111/agentmemory/health | jq . 2>/dev/null || agentmemory status"
+alias memviewer="echo 'Visualizador em: http://localhost:3113'"
+alias memlog="journalctl --user -u agentmemory -f"
+alias memrestart="systemctl --user restart agentmemory"
+
+# ---------------------------------------------------------------------------
 # FZF
 # ---------------------------------------------------------------------------
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh

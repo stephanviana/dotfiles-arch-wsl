@@ -47,6 +47,7 @@ Setup automatizado para ambiente de desenvolvimento em WSL 2 com **Arch Linux** 
 | **Antigravity CLI** (`agy`) | Assistente IA agêntico do Google |
 | **OpenCode CLI** | Agente IA open-source |
 | **Codex CLI** | Assistente de código IA |
+| **agentmemory** | Memória persistente multi-tier para agentes de IA (Claude, Codex, OpenCode, Antigravity) |
 | **fzf** | Busca fuzzy interativa no terminal |
 | **ripgrep** | Busca textual ultra rápida (`rg`) |
 | **zoxide** | Navegação inteligente entre pastas (`z`) |
@@ -163,18 +164,19 @@ chmod +x wsl/install.sh wsl/tools/*.sh
 ./wsl/install.sh
 ```
 
-O instalador executa em **9 etapas organizadas**:
+O instalador executa em **10 etapas organizadas**:
 
 ```text
-[1/9] 🌐 Rede e DNS (Mirrored + DNS Tunneling com systemd-resolved)
-[2/9] 📦 Atualização do Pacman e dependências base (base-devel, OpenJDK 17, 7zip, ffmpeg)
-[3/9] 🔀 asdf (binário Go) + Node.js (yarn/pnpm), Ruby, Python, Kotlin
-[4/9] 🐳 Docker Engine + Compose nativo (systemd-aware)
-[5/9] 📱 Android ADB bridge (android-tools) + scrcpy
-[6/9] 🔧 CLI tools (zsh, fzf, ripgrep, zoxide, gh, jq, agy, opencode, codex)
-[7/9] 🔗 Symlinks (.zshrc → ~/.zshrc, .gitconfig → ~/.gitconfig)
-[8/9] 🐚 Zsh como shell padrão
-[9/9] ✅ Resumo final
+[1/10] 🌐 Rede e DNS (Mirrored + DNS Tunneling com systemd-resolved)
+[2/10] 📦 Atualização do Pacman e dependências base (base-devel, OpenJDK 17, 7zip, ffmpeg)
+[3/10] 🔀 asdf (binário Go) + Node.js (yarn/pnpm), Ruby, Python, Kotlin
+[4/10] 🐳 Docker Engine + Compose nativo (systemd-aware)
+[5/10] 📱 Android ADB bridge (android-tools) + scrcpy
+[6/10] 🔧 CLI tools (zsh, fzf, ripgrep, zoxide, gh, jq, agy, opencode, codex)
+[7/10] 🧠 agentmemory (memória persistente e multi-tier para agentes de IA)
+[8/10] 🔗 Symlinks (.zshrc → ~/.zshrc, .gitconfig → ~/.gitconfig)
+[9/10] 🐚 Zsh como shell padrão
+[10/10] ✅ Resumo final
 ```
 
 #### 3. Ativar o systemd (necessário para Docker automático)
@@ -312,6 +314,33 @@ Copie a chave gerada e adicione nas configurações de SSH da sua conta no GitHu
 
 ---
 
+### 6. agentmemory (Memória Persistente para Agentes IA)
+
+O [agentmemory](https://github.com/rohitg00/agentmemory) fornece uma camada de memória persistente multi-tier para agentes de código (Claude Code, Codex, OpenCode, Antigravity, Cursor, etc.), evitando que eles "esqueçam" detalhes de arquitetura, decisões e preferências entre sessões.
+
+- **Serviço em Background:** Gerenciado via systemd user (`systemctl --user status agentmemory`), iniciando automaticamente com o WSL.
+- **Portas Utilizadas:**
+  - `3111` — API REST e servidor MCP (Model Context Protocol).
+  - `3113` — **Visualizador Web em Tempo Real** (abra [http://localhost:3113](http://localhost:3113) no seu navegador para ver as memórias e replay de sessões).
+  - `49134` — Comunicação interna do engine `iii`.
+- **Embeddings Locais (On-Device):** Pré-configurado com `EMBEDDING_PROVIDER=local` em `~/.agentmemory/.env`, executando o modelo `all-MiniLM-L6-v2` localmente e de forma 100% gratuita.
+
+#### Comandos Úteis e Aliases
+```bash
+memstatus    # Verifica a integridade da API do agentmemory
+memviewer    # Exibe o link do visualizador web (http://localhost:3113)
+memlog       # Acompanha logs do serviço via journalctl
+memrestart   # Reinicia o serviço no systemd user
+```
+
+#### Conectar outros agentes manualmente:
+```bash
+agentmemory connect <agente>   # Ex: claude-code, codex, opencode, cursor
+agentmemory doctor             # Diagnóstico interativo do ambiente
+```
+
+---
+
 ## Estrutura do Repositório
 
 ```text
@@ -322,15 +351,16 @@ dotfiles-arch/
 │   ├── setup.ps1          # Setup Windows: WSL 2 (Arch) + Winget + .wslconfig
 │   └── .wslconfig         # Configurações do WSL 2 (RAM, CPU, Mirrored Network)
 └── wsl/
-    ├── install.sh         # Instalador principal para Arch Linux (9 etapas)
-    ├── .zshrc             # Configuração do Zsh (asdf, aliases pacman, Docker, ADB)
+    ├── install.sh         # Instalador principal para Arch Linux (10 etapas)
+    ├── .zshrc             # Configuração do Zsh (asdf, aliases pacman/agentmemory, Docker, ADB)
     ├── .gitconfig         # Configuração do Git (aliases, diff, rebase)
     └── tools/
         ├── network.sh     # Rede + DNS (systemd-resolved + preservação de /etc/wsl.conf)
         ├── asdf.sh        # asdf v0.16+ Go binary + Node, Ruby, Python, Kotlin
         ├── docker.sh      # Docker Engine + Compose nativo Arch (systemd)
         ├── android.sh     # ADB bridge + scrcpy + instruções USBIPD
-        └── cli-tools.sh   # Oh My Zsh, plugins, fzf, ripgrep, zoxide, gh, jq, IAs
+        ├── cli-tools.sh   # Oh My Zsh, plugins, fzf, ripgrep, zoxide, gh, jq, IAs
+        └── agentmemory.sh # agentmemory + skills + systemd user + auto connect
 ```
 
 ---
