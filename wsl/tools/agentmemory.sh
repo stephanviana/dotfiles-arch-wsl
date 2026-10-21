@@ -1,125 +1,80 @@
-#!/bin/bash
-# =============================================================================
-# agentmemory — Memória persistente para Agentes de Código IA
-# Repositório: https://github.com/rohitg00/agentmemory
-# =============================================================================
+#!/usr/bin/env bash
+# Install one persistent AgentMemory server in the Arch filesystem.
 set -euo pipefail
 
-echo "🧠 Configurando agentmemory (memória persistente para IA)..."
-
-# ── 1. Garantir ambiente do Node.js e asdf ──────────────────────────────────
-export PATH="$HOME/.asdf/shims:$HOME/.local/bin:$PATH"
-
-if ! command -v npm &> /dev/null; then
-    echo "   ⚠️  npm não encontrado no PATH atual. Verifique se o asdf instalou o Node.js."
+if ! command -v npm >/dev/null 2>&1; then
+    printf 'Install Node.js and npm in Arch first.\n' >&2
     exit 1
 fi
 
-# ── 2. Instalar @agentmemory/agentmemory globalmente ────────────────────────
-echo "   → Instalando @agentmemory/agentmemory via npm..."
-npm install -g @agentmemory/agentmemory@latest
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/agentmemory" \
+    "$HOME/.agentmemory" "$HOME/.config/systemd/user"
+export PATH="$HOME/.local/bin:$PATH"
 
-# Atualizar shims do asdf se o asdf estiver presente
-if command -v asdf &> /dev/null; then
-    asdf reshim nodejs 2>/dev/null || true
+version="$(npm view @agentmemory/agentmemory dist-tags --json |
+    jq -r 'if type == "array" then .[-1].latest else .latest end')"
+if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf 'Could not resolve the latest stable AgentMemory version.\n' >&2
+    exit 1
+fi
+updated=false
+if [[ ! -x "$HOME/.local/bin/agentmemory" ]] || \
+    [[ $("$HOME/.local/bin/agentmemory" --version 2>/dev/null) != "$version" ]]; then
+    npm install --global --prefix "$HOME/.local" "@agentmemory/agentmemory@$version"
+    updated=true
 fi
 
-# ── 3. Criar diretório de configuração e .env inicial ───────────────────────
-echo "   → Configurando ~/.agentmemory/.env..."
-mkdir -p "$HOME/.agentmemory"
-
-if [ ! -f "$HOME/.agentmemory/.env" ]; then
-    cat > "$HOME/.agentmemory/.env" << 'EOF'
-# =============================================================================
-# Configuração do agentmemory (https://github.com/rohitg00/agentmemory)
-# =============================================================================
-
-# Provedor de Embeddings:
-# 'local' usa Xenova/all-MiniLM-L6-v2 localmente (gratuito, sem chave de API).
-# Comente ou deixe vazio para modo sem vetor (busca BM25 pura).
-EMBEDDING_PROVIDER=local
-
-# Compactação automática de observações com LLM (requer provedor de LLM configurado)
-AGENTMEMORY_AUTO_COMPRESS=false
-
-# Diretório padrão de persistência do iii-engine
-# AGENTMEMORY_DATA_DIR=~/.local/share/agentmemory
+env_file="$HOME/.agentmemory/.env"
+if [[ ! -e "$env_file" ]]; then
+    cat > "$env_file" <<EOF
+AGENTMEMORY_DATA_DIR=$HOME/.local/share/agentmemory
+AGENTMEMORY_AGENT_SCOPE=shared
+AGENTMEMORY_INJECT_CONTEXT=true
 EOF
-    echo "   ✅ ~/.agentmemory/.env criado com suporte a embeddings locais (on-device)."
+    chmod 600 "$env_file"
 fi
 
-# ── 4. Instalar Skills do agentmemory para os agentes ───────────────────────
-echo "   → Instalando 17 skills nativas do agentmemory via npx..."
-npx -y skills add rohitg00/agentmemory -y || true
-
-# ── 5. Configurar serviço Systemd User (inicialização em background no boot) ─
-echo "   → Configurando serviço do systemd user para agentmemory..."
-AGENTMEMORY_EXEC="$(command -v agentmemory || echo "$HOME/.asdf/shims/agentmemory")"
-
-mkdir -p "$HOME/.config/systemd/user"
-cat > "$HOME/.config/systemd/user/agentmemory.service" << EOF
+unit="$HOME/.config/systemd/user/agentmemory.service"
+if [[ ! -e "$unit" ]]; then
+    cat > "$unit" <<EOF
 [Unit]
-Description=agentmemory - Servidor de memoria persistente para Agentes IA
-After=network.target
+Description=AgentMemory on Arch Linux WSL
+After=network-online.target
 
 [Service]
 Type=simple
-Environment=PATH=$PATH
-Environment=HOME=$HOME
-ExecStart=$AGENTMEMORY_EXEC
+WorkingDirectory=%h
+Environment=PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin
+Environment=AGENTMEMORY_DATA_DIR=$HOME/.local/share/agentmemory
+ExecStart=$HOME/.local/bin/agentmemory --data-dir $HOME/.local/share/agentmemory
 Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=default.target
 EOF
-
-# Habilitar e iniciar serviço caso systemd esteja ativo
-if [ "$(ps -p 1 -o comm= 2>/dev/null)" = "systemd" ]; then
-    echo "   → Habilitando e iniciando serviço agentmemory via systemctl --user..."
-    systemctl --user daemon-reload || true
-    systemctl --user enable agentmemory.service || true
-    systemctl --user start agentmemory.service || true
-    echo "   ✅ Serviço agentmemory ativo em background!"
-else
-    echo "   ⚠️  systemd não está como PID 1. O serviço será ativado após o próximo 'wsl --shutdown'."
 fi
 
-# ── 6. Conectar automaticamente com agentes suportados ──────────────────────
-echo "   → Conectando agentmemory aos agentes instalados..."
-
-# OpenCode CLI
-if command -v opencode &> /dev/null || [ -d "$HOME/.config/opencode" ]; then
-    echo "     -> Conectando OpenCode..."
-    "$AGENTMEMORY_EXEC" connect opencode 2>/dev/null || true
+if [[ $(ps -p 1 -o comm=) == systemd ]]; then
+    systemctl --user daemon-reload
+    if ! systemctl --user is-active --quiet agentmemory.service && \
+        curl --fail --silent --max-time 2 \
+        http://127.0.0.1:3111/agentmemory/livez >/dev/null; then
+        printf 'Port 3111 is occupied. Stop the conflicting AgentMemory server before continuing.\n' >&2
+        exit 1
+    else
+        if [[ $(loginctl show-user "$USER" -p Linger --value) != yes ]] && \
+            ! sudo -n loginctl enable-linger "$USER" 2>/dev/null; then
+            printf 'Run sudo loginctl enable-linger %s for automatic startup.\n' "$USER"
+        fi
+        systemctl --user enable agentmemory.service
+        if [[ $updated == true ]]; then
+            systemctl --user restart agentmemory.service
+        else
+            systemctl --user start agentmemory.service
+        fi
+    fi
 fi
 
-# Codex CLI
-if command -v codex &> /dev/null || [ -d "$HOME/.codex" ]; then
-    echo "     -> Conectando Codex CLI (com hooks)..."
-    "$AGENTMEMORY_EXEC" connect codex --with-hooks 2>/dev/null || true
-fi
-
-# Claude Code
-if command -v claude &> /dev/null || [ -d "$HOME/.claude" ]; then
-    echo "     -> Conectando Claude Code (com hooks)..."
-    "$AGENTMEMORY_EXEC" connect claude-code --with-hooks 2>/dev/null || true
-fi
-
-# Cursor
-if [ -d "$HOME/.cursor" ]; then
-    echo "     -> Conectando Cursor..."
-    "$AGENTMEMORY_EXEC" connect cursor 2>/dev/null || true
-fi
-
-# GitHub Copilot CLI
-if command -v copilot &> /dev/null || [ -d "$HOME/.copilot" ]; then
-    echo "     -> Conectando GitHub Copilot CLI..."
-    "$AGENTMEMORY_EXEC" connect copilot-cli 2>/dev/null || true
-fi
-
-echo ""
-echo "✅ agentmemory configurado com sucesso!"
-echo "   Porta REST / MCP: http://localhost:3111"
-echo "   Visualizador Web: http://localhost:3113"
-echo "   Status:           systemctl --user status agentmemory"
+printf 'AgentMemory data: %s\n' "$HOME/.local/share/agentmemory"
+printf 'AgentMemory unit: %s\n' "$unit"
