@@ -11,7 +11,7 @@ export PATH="$HOME/.local/bin:$PATH"
 # Oh My Zsh
 # ---------------------------------------------------------------------------
 export ZSH="$HOME/.oh-my-zsh"
-ZSH_THEME="robbyrussell"
+ZSH_THEME=""
 
 plugins=(
     git
@@ -23,15 +23,7 @@ plugins=(
     zsh-syntax-highlighting
 )
 
-source "$ZSH/oh-my-zsh.sh"
-
-# ---------------------------------------------------------------------------
-# asdf v0.16+ (binário Go)
-# ---------------------------------------------------------------------------
-export ASDF_DATA_DIR="$HOME/.asdf"
-# completions
-fpath=("${ASDF_DATA_DIR}/completions" $fpath)
-autoload -Uz compinit && compinit
+[[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
 
 # ---------------------------------------------------------------------------
 # Java JDK (OpenJDK 17 LTS - Arch Linux)
@@ -46,18 +38,14 @@ fi
 # ---------------------------------------------------------------------------
 # Android ADB Bridge (ponte TCP — método Akita)
 # ---------------------------------------------------------------------------
-export ADB_SERVER_SOCKET=tcp:host.docker.internal:5037
+export ADB_SERVER_SOCKET=tcp:127.0.0.1:5037
 export ANDROID_HOME="$HOME/Android/Sdk"
-export PATH="$PATH:$ANDROID_HOME/platform-tools"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 
 # ---------------------------------------------------------------------------
-# Docker — iniciar se não estiver rodando
+# Docker é iniciado pelo systemd
 # ---------------------------------------------------------------------------
-if ! pgrep -x "dockerd" > /dev/null 2>&1; then
-    if [ "$(ps -p 1 -o comm= 2>/dev/null)" = "systemd" ]; then
-        sudo systemctl start docker > /dev/null 2>&1 || true
-    fi
-fi
 
 # ---------------------------------------------------------------------------
 # Aliases — Navegação
@@ -111,7 +99,7 @@ alias dotfiles="cd ~/.dotfiles"
 # ---------------------------------------------------------------------------
 # agentmemory (https://github.com/rohitg00/agentmemory)
 # ---------------------------------------------------------------------------
-export AGENTMEMORY_URL="http://localhost:3111"
+export AGENTMEMORY_URL="http://127.0.0.1:3111"
 
 alias mem="agentmemory"
 alias memstatus="curl -s http://localhost:3111/agentmemory/health | jq . 2>/dev/null || agentmemory status"
@@ -127,9 +115,19 @@ alias memrestart="systemctl --user restart agentmemory"
 # ---------------------------------------------------------------------------
 # Zoxide (substituição do cd)
 # ---------------------------------------------------------------------------
-eval "$(zoxide init zsh)"
+command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
 
 # ---------------------------------------------------------------------------
 # PATH extras
 # ---------------------------------------------------------------------------
 export PATH="$HOME/.local/bin:$PATH"
+
+# mise seleciona as linguagens e o uv conforme a configuração do projeto.
+if command -v mise >/dev/null 2>&1; then
+    eval "$(mise activate zsh)"
+fi
+
+# Starship fornece o mesmo prompt no Zsh e no PowerShell.
+if command -v starship >/dev/null 2>&1; then
+    eval "$(starship init zsh)"
+fi

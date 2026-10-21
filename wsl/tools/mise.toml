@@ -1,0 +1,14 @@
+[tools]
+node = "latest"
+ruby = "latest"
+kotlin = "latest"
+python = "latest"
+uv = "latest"
+
+[settings]
+jobs = 2
+python.compile = false
+
+[env]
+UV_PYTHON_DOWNLOADS = "never"
+UV_PYTHON_PREFERENCE = "only-system"
