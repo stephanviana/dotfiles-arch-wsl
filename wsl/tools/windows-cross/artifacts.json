@@ -1,0 +1,22 @@
+{
+  "gstreamer-sdk": {
+    "url": "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.11/msvc/gstreamer-1.0-devel-msvc-x86_64-1.26.11.msi",
+    "sha256": "af0a0720692052aaf5fb0cf2847ef34a87016ef0f914328d516f049e6c86f587",
+    "source": "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.11/msvc/gstreamer-1.0-devel-msvc-x86_64-1.26.11.msi.sha256sum"
+  },
+  "gstreamer-runtime": {
+    "url": "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.11/msvc/gstreamer-1.0-msvc-x86_64-1.26.11.msi",
+    "sha256": "31cbc21fa0950b5c1e79c80959b2799805cb05a7a35953a13a9f790776137605",
+    "source": "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.11/msvc/gstreamer-1.0-msvc-x86_64-1.26.11.msi.sha256sum"
+  },
+  "nsis": {
+    "url": "https://deb.debian.org/debian/pool/main/n/nsis/nsis_3.11-1_amd64.deb",
+    "sha256": "e6eb6ffb70f0df09e95dedb2d2cf55ad3c2679f7c2ae357d0c00cc4c83178690",
+    "source": "https://deb.debian.org/debian/dists/trixie/main/binary-amd64/Packages.xz"
+  },
+  "nsis-common": {
+    "url": "https://deb.debian.org/debian/pool/main/n/nsis/nsis-common_3.11-1_all.deb",
+    "sha256": "103a3284c1a5356efa0aba90fdfc391c3cde8e7df8726377cef0f98471584047",
+    "source": "https://deb.debian.org/debian/dists/trixie/main/binary-amd64/Packages.xz"
+  }
+}
