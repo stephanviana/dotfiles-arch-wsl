@@ -85,30 +85,6 @@ if (-not (Test-Path -LiteralPath $validator)) {
 $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 $env:Path = @(@($machinePath, $userPath) | Where-Object { $_ }) -join ';'
-$gstRoot = [Environment]::GetEnvironmentVariable('GSTREAMER_1_0_ROOT_MSVC_X86_64', 'Machine')
-if (-not $gstRoot) {
-    $gstRoot = [Environment]::GetEnvironmentVariable('GSTREAMER_1_0_ROOT_MSVC_X86_64', 'User')
-}
-if ($gstRoot) {
-    $gstBin = Join-Path $gstRoot 'bin'
-    if (Test-Path -LiteralPath (Join-Path $gstBin 'gst-inspect-1.0.exe')) {
-        $env:GSTREAMER_1_0_ROOT_MSVC_X86_64 = $gstRoot
-        $env:Path = "$gstBin;$env:Path"
-    }
-}
-$llvmBin = Join-Path $env:ProgramFiles 'LLVM\bin'
-if (Test-Path -LiteralPath (Join-Path $llvmBin 'libclang.dll')) {
-    $env:LIBCLANG_PATH = $llvmBin
-    $env:Path = "$llvmBin;$env:Path"
-}
-
-$cudaRoot = [Environment]::GetEnvironmentVariable('CUDA_PATH', 'User')
-if (-not $cudaRoot) { $cudaRoot = [Environment]::GetEnvironmentVariable('CUDA_PATH', 'Machine') }
-if ($cudaRoot -and (Test-Path -LiteralPath (Join-Path $cudaRoot 'bin\nvcc.exe'))) {
-    $env:CUDA_PATH = $cudaRoot
-    $env:Path = "$(Join-Path $cudaRoot 'bin');$env:Path"
-}
-
 Push-Location $workspace
 try {
     $env:WINDOWS_VALIDATION_WORKSPACE = $workspace

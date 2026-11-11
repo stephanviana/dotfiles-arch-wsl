@@ -4,9 +4,9 @@ $ErrorActionPreference = 'Stop'
 $catalog = Import-PowerShellDataFile (Join-Path $PSScriptRoot 'versions.psd1')
 $apps = $catalog.Apps
 
-function Install-App([string]$Id, [string]$Source = 'winget', [string]$Version = '', [string]$Override = '') {
+function Install-App([string]$Id, [string]$Source = 'winget', [string]$Version = '', [string]$Override = '', [switch]$SkipInstalledCheck) {
     if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) { throw 'winget ausente.' }
-    if (-not $Version) {
+    if (-not $Version -and -not $SkipInstalledCheck) {
         & winget.exe list --id $Id --exact --source $Source --accept-source-agreements --disable-interactivity > $null 2>&1
         if ($LASTEXITCODE -eq 0) { Write-Host "Preservando pacote instalado: $Id"; return }
     }
@@ -33,7 +33,7 @@ function Test-VCRedistSet {
 }
 
 foreach ($id in @($catalog.Desktop.Winget.VSCode, $apps.Winget.IntelliJ,
-    $apps.Winget.Bitwarden, $apps.Winget.DotNet, $apps.Winget.VCRedist,
+    $apps.Winget.Bitwarden, $apps.Winget.VCRedist,
     $apps.Winget.WinRAR, $apps.Winget.SevenZip, $apps.Winget.VLC, $apps.Winget.YouTubeMusic)) {
     if ($id -eq $apps.Winget.VCRedist) {
         if (Test-VCRedistSet) { Write-Host 'Preservando runtimes Visual C++ x86/x64 completos.' }
@@ -46,6 +46,34 @@ foreach ($id in @($catalog.Desktop.Winget.VSCode, $apps.Winget.IntelliJ,
 
 $env:Path = (@($env:Path, [Environment]::GetEnvironmentVariable('Path', 'Machine'),
     [Environment]::GetEnvironmentVariable('Path', 'User')) | Where-Object { $_ }) -join ';'
+# Node.js is retained for Windows tools; these checks do not configure a compiler toolchain.
+$nodeValid = $false
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    $nodeValid = [version]((& node --version).TrimStart('v')) -ge [version]$catalog.Desktop.NodeMinimum
+}
+if (-not $nodeValid -or -not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    Install-App $catalog.Desktop.Winget.Node -SkipInstalledCheck
+    $env:Path = (@($env:Path, [Environment]::GetEnvironmentVariable('Path', 'Machine'),
+        [Environment]::GetEnvironmentVariable('Path', 'User')) | Where-Object { $_ }) -join ';'
+}
+if (-not (Get-Command node -ErrorAction SilentlyContinue) -or
+    -not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
+    throw 'Node.js ou npm nao encontrado; abra outro terminal e reaplique o setup.'
+}
+if ([version]((& node --version).TrimStart('v')) -lt [version]$catalog.Desktop.NodeMinimum) {
+    throw "Node.js abaixo da versao minima $($catalog.Desktop.NodeMinimum)."
+}
+$webViewRoots = @(
+    (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\EdgeWebView\Application'),
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\EdgeWebView\Application')
+)
+if (-not @($webViewRoots | Where-Object { Test-Path -LiteralPath $_ }).Count) {
+    Install-App $catalog.Desktop.Winget.WebView2 -SkipInstalledCheck
+}
+if (-not @($webViewRoots | Where-Object { Test-Path -LiteralPath $_ }).Count) {
+    throw 'WebView2 Runtime nao foi encontrado apos a instalacao.'
+}
+
 if (-not (Get-Command adb.exe -ErrorAction SilentlyContinue)) {
     Install-App $apps.Winget.PlatformTools
     $env:Path = (@([Environment]::GetEnvironmentVariable('Path', 'Machine'),
@@ -103,37 +131,7 @@ if (@($video | Where-Object PNPDeviceID -match 'VEN_10DE').Count) {
     $supportedModels = @($nvidiaModels | Where-Object { $_ -notin $apps.NvidiaAppUnsupportedModels })
     if ($supportedModels.Count) { Install-App $apps.NvidiaAppStoreId 'msstore' }
     else { Write-Warning "NVIDIA App indisponivel para $($nvidiaModels -join ', '): GPU recusada pelo instalador oficial." }
-    $smi = Join-Path $env:WINDIR 'System32\nvidia-smi.exe'
-    if (-not (Test-Path -LiteralPath $smi)) { throw 'Driver NVIDIA/nvidia-smi ausente; instale o driver oficial antes do CUDA.' }
-    $rawCapabilities = @(& $smi --query-gpu=compute_cap --format=csv,noheader)
-    if ($LASTEXITCODE -ne 0 -or -not $rawCapabilities.Count) { throw 'Nao foi possivel identificar a capacidade CUDA da GPU.' }
-    $capabilities = @($rawCapabilities | ForEach-Object { [double]::Parse($_.Trim(), [Globalization.CultureInfo]::InvariantCulture) })
-    $minimum = ($capabilities | Measure-Object -Minimum).Minimum
-    if ($minimum -lt 5.0) { throw 'GPU NVIDIA anterior a Maxwell: selecione manualmente um CUDA compativel.' }
-    if ($minimum -lt 7.5) {
-        # CUDA 13 removed Maxwell/Pascal/Volta compilation and library support.
-        $legacyNvcc = Join-Path $env:ProgramFiles "NVIDIA GPU Computing Toolkit\CUDA\v$($apps.CudaLegacyVersion)\bin\nvcc.exe"
-        if (-not (Test-Path -LiteralPath $legacyNvcc)) {
-            # Install toolkit libraries/compiler without replacing the display driver.
-            $components = @($apps.CudaLegacyComponents | ForEach-Object { "$_`_$($apps.CudaLegacyVersion)" })
-            Install-App $apps.Winget.CUDA 'winget' $apps.CudaLegacyVersion ('-s -n ' + ($components -join ' '))
-        }
-        if (-not (Test-Path -LiteralPath $legacyNvcc)) { throw 'Compilador CUDA compativel ausente apos a instalacao.' }
-        $cudaRoot = Split-Path -Parent (Split-Path -Parent $legacyNvcc)
-        [Environment]::SetEnvironmentVariable('CUDA_PATH', $cudaRoot, 'User')
-        $env:CUDA_PATH = $cudaRoot
-        # Prefer the compatible toolkit in new terminals as well as in the runner.
-        $cudaBin = Join-Path $cudaRoot 'bin'
-        $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-        $pathEntries = @($userPath -split ';' | Where-Object {
-            $_ -and $_.TrimEnd('\') -ine $cudaBin
-        })
-        [Environment]::SetEnvironmentVariable('Path', (@($cudaBin) + $pathEntries -join ';'), 'User')
-        $env:Path = "$cudaBin;$env:Path"
-        Write-Host "CUDA compativel com a GPU: $cudaRoot"
-    } else {
-        Install-App $apps.Winget.CUDA
-    }
+
 }
 
 Write-Host 'Aplicativos Windows configurados. Agentes de codigo e SDK Android ficam no Arch.'

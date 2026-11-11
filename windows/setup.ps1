@@ -60,13 +60,6 @@ if (Test-Path -LiteralPath $terminalSetup) {
     Write-Warning 'Execute windows/setup-terminal.ps1 a partir do checkout para configurar o Windows Terminal.'
 }
 
-$desktopSetup = Join-Path $PSScriptRoot 'setup-desktop.ps1'
-if (Test-Path -LiteralPath $desktopSetup) {
-    & $desktopSetup
-} else {
-    Write-Warning 'Execute windows/setup-desktop.ps1 a partir do checkout para configurar a toolchain desktop Windows.'
-}
-
 # A foreground WSL process keeps systemd user services available to Windows apps.
 $taskName = 'ArchWSLKeepAlive'
 $runtimeDir = Join-Path $env:LOCALAPPDATA 'dotfiles-wsl-arch'
