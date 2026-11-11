@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $packages = (Import-PowerShellDataFile (Join-Path $PSScriptRoot 'versions.psd1')).Desktop.Winget
 $terminalConfig = Join-Path $PSScriptRoot 'terminal\settings.json'
 $profileTemplate = Join-Path $PSScriptRoot 'terminal\profile.ps1'
+$starshipTemplate = Join-Path $PSScriptRoot 'terminal\starship.toml'
 
 function Install-WingetPackage([string]$Id) {
     if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
@@ -68,6 +69,8 @@ $profileDir = Join-Path $env:LOCALAPPDATA 'dotfiles-wsl-arch'
 New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
 $profilePath = Join-Path $profileDir 'profile.ps1'
 [IO.File]::WriteAllText($profilePath, [IO.File]::ReadAllText($profileTemplate), [Text.UTF8Encoding]::new($false))
+$starshipPath = Join-Path $profileDir 'starship.toml'
+[IO.File]::WriteAllText($starshipPath, [IO.File]::ReadAllText($starshipTemplate), [Text.UTF8Encoding]::new($false))
 
 $settingsCandidates = @(
     (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),

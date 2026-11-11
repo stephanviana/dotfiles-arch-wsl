@@ -1,0 +1,2 @@
+# Allow Git for Windows more time to start before Starship gives up.
+command_timeout = 3000
