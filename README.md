@@ -21,9 +21,9 @@ O Arch no WSL 2 é a workstation principal: projetos em `~/dev`, VS Code Server,
 
 ## Configuração
 
-1. No PowerShell do Windows, execute `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\setup.ps1` a partir deste checkout. O script preserva uma distribuição `archlinux` e um `.wslconfig` já existentes. Em uma máquina com pelo menos 16 GiB de RAM e 8 CPUs lógicas, cria o perfil de referência com 8 GB de memória, 4 CPUs, 2 GB de swap, rede mirrored, DNS tunneling e WSLg habilitado. Registra a tarefa oculta `ArchWSLKeepAlive` no logon para manter os serviços do Arch disponíveis aos aplicativos Windows. Também chama `windows/setup-apps.ps1`, `windows/setup-terminal.ps1` e `windows/setup-desktop.ps1` e instala o runner Windows em `%LOCALAPPDATA%\dotfiles-wsl-arch`.
+1. No PowerShell do Windows, execute `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\setup.ps1` a partir deste checkout. O script preserva uma distribuição `archlinux` e um `.wslconfig` já existentes. Em uma máquina com pelo menos 16 GiB de RAM e 8 CPUs lógicas, cria o perfil de referência com 8 GB de memória, 4 CPUs, 2 GB de swap, rede mirrored, DNS tunneling e WSLg habilitado. Registra a tarefa oculta `ArchWSLKeepAlive` no logon para manter os serviços do Arch disponíveis aos aplicativos Windows. Também chama `windows/setup-apps.ps1` e `windows/setup-terminal.ps1` e instala o runner Windows em `%LOCALAPPDATA%\dotfiles-wsl-arch`.
 2. Na primeira inicialização do Arch, crie um usuário normal com `sudo`, configure-o como padrão em `/etc/wsl.conf` e habilite systemd. Uma instalação já configurada é preservada.
-3. Clone este repositório em `~/dev` **dentro do filesystem Linux**. No Arch, execute `bash wsl/install.sh --all`. O instalador aceita também `--base`, `--mise`, `--paru`, `--lazyvim`, `--vscode`, `--windows-runner`, `--android`, `--android-studio`, `--supabase`, `--agentmemory` e `--agents` para instalar uma parte por vez. Depois de `--base`, execute `wsl --shutdown` no Windows e abra o Arch novamente para aplicar `appendWindowsPath=false`. Se quiser manter o serviço acessível antes do próximo logon, execute `Start-ScheduledTask -TaskName ArchWSLKeepAlive` no PowerShell.
+3. Clone este repositório em `~/dev` **dentro do filesystem Linux**. No Arch, execute `bash wsl/install.sh --all`. O instalador aceita também `--base`, `--mise`, `--paru`, `--lazyvim`, `--vscode`, `--windows-runner`, `--windows-cross`, `--android`, `--android-studio`, `--supabase`, `--agentmemory` e `--agents` para instalar uma parte por vez. Depois de `--base`, execute `wsl --shutdown` no Windows e abra o Arch novamente para aplicar `appendWindowsPath=false`. Se quiser manter o serviço acessível antes do próximo logon, execute `Start-ScheduledTask -TaskName ArchWSLKeepAlive` no PowerShell.
 
 O perfil de referência está em [windows/.wslconfig](windows/.wslconfig). Ele reserva até 8 GB para o WSL; ajuste esse limite conforme a memória da máquina, o projeto Android e os serviços Supabase usados. O instalador não substitui uma configuração WSL existente automaticamente.
 O `autoMemoryReclaim` não é sobrescrito, para manter o comportamento padrão do WSL instalado.
@@ -67,6 +67,7 @@ Depois execute `wsl --shutdown` no Windows e abra o Arch novamente. Clone o repo
 | `--lazyvim` | Neovim e template oficial LazyVim |
 | `--vscode` | Launcher oficial do VS Code Windows acessível pelo Arch, sem importar todo o `PATH` Windows |
 | `--windows-runner` | Comandos `windows-sync` e `validate-windows` no `~/.local/bin` |
+| `--windows-cross` | Toolchain opcional de compilação cruzada Windows MSVC x64 no Arch |
 | `--android` | Android SDK Linux e cliente ADB para o servidor Windows |
 | `--android-studio` | SDK, Paru se necessário, Android Studio Linux e lançador WSLg |
 | `--supabase` | Supabase CLI no Arch |
@@ -80,14 +81,13 @@ A tarefa `ArchWSLKeepAlive` executa [windows/keepalive.ps1](windows/keepalive.ps
 
 ### Entradas Windows e ordem de execução
 
-Execute os comandos abaixo na raiz do checkout Windows. O setup completo instala primeiro os aplicativos, depois o terminal e a toolchain desktop; ao final, copia o runner Windows e registra o keepalive.
+Execute os comandos abaixo na raiz do checkout Windows. O setup completo instala primeiro os aplicativos, incluindo Node.js e os runtimes Windows, e depois o terminal; ao final, copia o runner Windows e registra o keepalive.
 
 | Comando PowerShell | Finalidade e opções |
 | --- | --- |
 | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\setup.ps1` | Setup completo do host; instala `archlinux` quando ausente. |
-| `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\setup-apps.ps1` | Aplicativos, IDEs, .NET, runtimes, ferramentas de hardware e YouTube Music Desktop pelo winget. |
+| `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\setup-apps.ps1` | Aplicativos, IDEs, Node.js, runtimes, ferramentas de hardware e YouTube Music Desktop pelo winget. |
 | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\setup-terminal.ps1` | Terminal, fonte, Starship e cores. |
-| `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\setup-desktop.ps1` | Compiladores e dependências nativas do target Windows. |
 | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\keepalive.ps1 -RepairOnly` | Diagnóstico/reparo específico do WSLg, sem manter uma sessão permanente. |
 
 Instalações de sistema e o bootstrap do Chocolatey podem pedir elevação. Use a conta Windows que utilizará o ambiente: configurações em `%USERPROFILE%`, `%APPDATA%` e `%LOCALAPPDATA%` pertencem a essa conta. O setup interrompe diante de uma falha; reaplique a etapa responsável após corrigir a mensagem. As instalações e downloads já concluídos não são desfeitos automaticamente.
@@ -100,10 +100,9 @@ Instalações de sistema e o bootstrap do Chocolatey podem pedir elevação. Use
 | `.gitattributes` | Normalização em LF; arquivos `*.ps1` em CRLF no checkout. |
 | `README.md` | Instalação, operação, manutenção e referência das configurações. |
 | `windows/setup.ps1` | Entrada Windows, recursos WSL, sequência de instalação, tarefa de logon e cópia do runner. |
-| `windows/versions.psd1` | Catálogo de IDs winget/Store, incluindo ADB e Painel de Controle NVIDIA; mínimo Node, GStreamer fixado e CUDA legado por compatibilidade. |
-| `windows/setup-apps.ps1` | Aplicativos Windows e IDEs; Chocolatey, .NET, runtimes e componentes Intel/NVIDIA. |
+| `windows/versions.psd1` | Catálogo de IDs winget/Store, incluindo ADB e Painel de Controle NVIDIA, e mínimo Node. |
+| `windows/setup-apps.ps1` | Aplicativos Windows e IDEs; Chocolatey, runtimes e utilitários Intel/NVIDIA. |
 | `windows/.wslconfig` | Modelo de recursos, rede mirrored, DNS tunneling e WSLg. |
-| `windows/setup-desktop.ps1` | Dependências de compilação e execução do target desktop Windows. |
 | `windows/setup-terminal.ps1` | Instala e aplica o terminal, a fonte e o perfil PowerShell. |
 | `windows/terminal/settings.json` | Perfis, fonte, paleta ANSI e atalhos do Windows Terminal. |
 | `windows/terminal/profile.ps1` | Starship e realce de parâmetros do PSReadLine. |
@@ -161,7 +160,20 @@ Os backups são locais e não fazem parte do versionamento. Os backups temporár
 
 ### Configuração do ambiente Arch
 
-A etapa `--base` atualiza o sistema com `pacman -Syu` e instala Git; Docker Engine, Compose e Buildx; Node.js LTS, npm, pnpm e Yarn; Rust/Cargo; OpenJDK 17 e 21, Kotlin e Gradle; Python, pip e virtualenv; Ruby, Bundler e sua biblioteca padrão; `android-tools`; `base-devel`, unzip e bibliotecas de compilação; Zsh, Starship, curl, wget, ripgrep, jq, fzf, zoxide e GitHub CLI. Também instala CMake, Ninja, LLVM/Clang, FFmpeg/FFprobe e GStreamer com GES e plugins. Essas ferramentas fazem parte do ambiente completo do Arch. O JDK 17 é o `JAVA_HOME` padrão em `env.sh`; o JDK 21 está disponível para projetos que o exigem. `wget` é necessário para o download inicial do VS Code Server pela extensão WSL. O `--base` cria `~/dev` e `~/.local/bin`.
+A etapa `--base` atualiza o sistema com `pacman -Syu` e instala Git; Docker Engine, Compose e Buildx; Node.js LTS, npm, pnpm e Yarn; Rust/Cargo; OpenJDK 17 e 21, Kotlin e Gradle; Python, pip e virtualenv; Ruby, Bundler e sua biblioteca padrão; `android-tools`; `base-devel`, unzip e bibliotecas de compilação; Zsh, Starship, curl, wget, ripgrep, jq, fzf, zoxide e GitHub CLI. Também instala CMake, Ninja, LLVM/Clang e FFmpeg/FFprobe. O JDK 17 é o `JAVA_HOME` padrão em `env.sh`; o JDK 21 está disponível para projetos que o exigem. `wget` é necessário para o download inicial do VS Code Server pela extensão WSL. O `--base` cria `~/dev` e `~/.local/bin`.
+
+### Compilação cruzada Windows MSVC no Arch
+
+A etapa opcional `bash wsl/install.sh --windows-cross` instala a toolchain isolada e disponibiliza `windows-cross` em `~/.local/bin`. O módulo mantém Rust/Cargo privados e cache do SDK Microsoft fora do Git, com um job por padrão. Consulte o [guia de cross-compilation](docs/windows-cross.md) para instalação limpa, SDK GStreamer/GES, runtime Windows, NSIS, hashes, licenças e testes.
+
+```bash
+windows-cross check
+windows-cross test
+# Na raiz de qualquer projeto Cargo:
+windows-cross exec cargo xwin build --target x86_64-pc-windows-msvc
+```
+
+GStreamer e NSIS são opcionais e preparados separadamente: `windows-cross sdk prepare`, `windows-cross runtime prepare` e `windows-cross nsis prepare`. O SDK requer `msitools` do Arch. A toolchain e os SDKs de desenvolvimento ficam no Arch.
 
 ### Linguagens com mise e ambiente Python
 
@@ -201,13 +213,11 @@ As instalações do mise são independentes das instalações do asdf, conforme 
 | --- | --- |
 | CMake, Ninja e LLVM/Clang | Pacotes `cmake`, `ninja`, `llvm` e `clang`; `LIBCLANG_PATH=/usr/lib` aponta para `libclang.so`, usada por bindgen/whisper-rs. |
 | FFmpeg e FFprobe | Pacote `ffmpeg`, com os dois executáveis Linux no `PATH`. |
-| GStreamer e GES | `gstreamer`, `gst-editing-services`, `gst-plugins-base`, `gst-plugins-good`, `gst-plugins-bad`, `gst-plugins-ugly` e `gst-libav`; os pacotes incluem runtime, cabeçalhos e arquivos pkg-config. |
-| Plugins gráficos e áudio | `glshader` para OpenGL; `pitch` com a biblioteca `soundtouch`; `pulsesink` para o servidor de áudio do WSLg. |
 | Python e Ruby | Python, pip, uv e Ruby selecionados pelo mise; dependências de projeto ficam em ambientes virtuais e nos manifests/lockfiles de cada projeto. |
 
-O instalador verifica o carregamento de `libclang.so`, os módulos pkg-config de GStreamer/GL/GES e a existência de `glshader`, `pitch` e `pulsesink`. No Windows, o setup separado instala MSVC x64, WebView2, DLLs e `wasapi2sink`. Os builds Linux usam executáveis ELF e bibliotecas `.so` do Arch; as configurações WSLg fornecidas pelo WSL cuidam dos displays e do áudio.
+O instalador verifica o carregamento de `libclang.so`. No Windows, o setup separado assegura o runtime WebView2. Os builds Linux usam executáveis ELF e bibliotecas `.so` do Arch; as configurações WSLg fornecidas pelo WSL cuidam dos displays e do áudio.
 
-Para reaplicar todos esses componentes no Arch, execute `bash wsl/install.sh --base`. A seção de mise acima descreve o uso de Python e uv; `python -m venv .venv` também cria um ambiente com o Python selecionado. Projetos Rust encontram GStreamer/GES por pkg-config. O launcher Android mantém o cliente ADB Linux apontando para o servidor Windows.
+Para reaplicar esses componentes no Arch, execute `bash wsl/install.sh --base`. A seção de mise acima descreve o uso de Python e uv; `python -m venv .venv` também cria um ambiente com o Python selecionado. Projetos que precisem de GStreamer ou GES no Linux devem instalar suas próprias dependências. O launcher Android mantém o cliente ADB Linux apontando para o servidor Windows.
 
 `wsl/tools/configure-shell.sh` instala Oh My Zsh e os plugins `zsh-autosuggestions` e `zsh-syntax-highlighting`, confirma que o Starship está instalado, define Zsh como shell padrão, gera `en_US.UTF-8` e copia `wsl/tools/env.sh` para `~/.config/dotfiles-wsl-arch/env.sh`. O ambiente é carregado por `~/.zshenv` e `~/.bash_profile`, inclusive quando a sessão abre por um lançador. O arquivo exporta `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `JAVA_HOME`, `ADB_SERVER_SOCKET`, `AGENTMEMORY_URL` e `LIBCLANG_PATH`, além de acrescentar `~/.local/bin`, os shims do mise e as ferramentas do SDK ao `PATH`. A ativação do mise é acrescentada ao `.zshrc` existente quando ausente.
 
@@ -219,9 +229,9 @@ O instalador só copia `wsl/.zshrc` e `wsl/.gitconfig` quando esses arquivos nã
 | --- | --- |
 | VS Code GUI, WSLg e outras interfaces nativas | VS Code Server e Android Studio Linux; repositórios e builds em `~/dev` |
 | ADB server e conexão USB com o dispositivo | Cliente ADB apontando para `127.0.0.1:5037` |
-| Rust MSVC, .NET SDK e ferramentas nativas Windows | JDK 17/21, Kotlin, Gradle e Android SDK Linux |
+| Node.js para ferramentas Windows e runtime WebView2 | Rust, toolchain cross Windows, JDK 17/21, Kotlin, Gradle e Android SDK Linux |
 | Aplicativos pessoais e utilitários de hardware | Docker Engine/Compose, Supabase CLI e servidor AgentMemory |
-| Tarefa `ArchWSLKeepAlive` no logon e .NET SDK para targets Windows | OpenCode, Antigravity CLI (`agy`) e Codex CLI |
+| Tarefa `ArchWSLKeepAlive` no logon | OpenCode, Antigravity CLI (`agy`) e Codex CLI |
 
 ### Shell, Paru e LazyVim
 
@@ -311,7 +321,7 @@ if ($LASTEXITCODE -ne 0) { throw 'testes Windows falharam' }
 if ($LASTEXITCODE -ne 0) { throw 'build Windows falhou' }
 ~~~
 
-Adapte o arquivo para pnpm, Tauri, Electron, .NET ou outras tarefas reais do projeto. O runner falha com mensagem clara se esse arquivo não existir. O [runner versionado](windows/validate-project.ps1) usa `robocopy /MIR`, trata os códigos de retorno documentados pela [Microsoft](https://learn.microsoft.com/windows-server/administration/windows-commands/robocopy/) e rejeita targets existentes sem um marcador que os associe ao projeto de origem. Ele exclui `.git` e diretórios de dependências/artefatos, entre eles `node_modules`, `target`, `.gradle`, `dist`, `build`, `coverage` e caches de frameworks. Esses diretórios permanecem próprios de cada plataforma. O processo Windows prioriza o GStreamer MSVC x64, LLVM e o CUDA indicado por `CUDA_PATH` (usuário antes de máquina) no `PATH`, mesmo quando outra ferramenta homônima aparece antes no `PATH` global.
+Adapte o arquivo para pnpm, Tauri, Electron, .NET ou outras tarefas reais do projeto. O runner falha com mensagem clara se esse arquivo não existir. O [runner versionado](windows/validate-project.ps1) usa `robocopy /MIR`, trata os códigos de retorno documentados pela [Microsoft](https://learn.microsoft.com/windows-server/administration/windows-commands/robocopy/) e rejeita targets existentes sem um marcador que os associe ao projeto de origem. Ele exclui `.git` e diretórios de dependências/artefatos, entre eles `node_modules`, `target`, `.gradle`, `dist`, `build`, `coverage` e caches de frameworks. Esses diretórios permanecem próprios de cada plataforma. O processo Windows recebe o PATH configurado no sistema e no usuário; dependências específicas devem ser fornecidas pelo projeto.
 
 O target padrão é `C:\Dev\.targets`. Para outra unidade local, defina `WINDOWS_VALIDATION_ROOT` no Arch com um caminho Windows que termine em `\.targets`. O runner rejeita caminhos inesperados, junções no target e uma cópia associada a outro projeto. Não compile no caminho `\\wsl.localhost\...`: esse UNC é apenas a origem da cópia. Não execute builds Linux pesados em `/mnt/c`.
 
@@ -405,12 +415,10 @@ Os IDs e as condições de hardware ficam em `windows/versions.psd1`. Esse arqui
 | Bitwarden | `Bitwarden.Bitwarden` via winget; login e desbloqueio do cofre são feitos pelo usuário. |
 | VS Code | `Microsoft.VisualStudioCode` e extensão `ms-vscode-remote.remote-wsl`. |
 | IntelliJ IDEA | `JetBrains.IntelliJIDEA`; distribuição estável unificada com funcionalidades essenciais gratuitas. |
-| .NET 10 SDK | `Microsoft.DotNet.SDK.10`; runtime isolado não substitui o SDK. |
 | Visual C++ Redistributables AIO | `abbodi1406.vcredist`; repack comunitário dos runtimes Microsoft, incluindo famílias antigas. |
 | Intel Driver & Support Assistant | `Intel.IntelDriverAndSupportAssistant` quando houver CPU Intel ou GPU Intel. |
 | Painel de Controle NVIDIA | ID `9NF8H0H7WMLT` da Microsoft Store quando houver GPU NVIDIA; mantém o pacote existente e verifica sua presença após instalar. |
 | NVIDIA App | ID `XP8CLZL93F5Z4P` da Microsoft Store quando houver GPU NVIDIA compatível; a MX110 está na exceção de hardware do catálogo. |
-| NVIDIA CUDA Toolkit | `Nvidia.CUDA`, com seleção pela capacidade da GPU. |
 | WinRAR | `RARLab.WinRAR`. |
 | 7-Zip | `7zip.7zip`. |
 | VLC | `VideoLAN.VLC`. |
@@ -420,11 +428,11 @@ Os IDs e as condições de hardware ficam em `windows/versions.psd1`. Esse arqui
 
 A [JetBrains unificou as distribuições](https://www.jetbrains.com/help/idea/installation-guide.html) a partir da linha 2025.3. O pacote antigo `JetBrains.IntelliJIDEA.Community` não é a escolha para obter os releases atuais. A IDE inclui seu runtime de execução; projetos Kotlin/Java WSL usam os JDKs e o Gradle do Arch. Abra projetos Linux com a integração WSL da IDE e confira o SDK e o Gradle JVM do projeto. O setup não escolhe automaticamente SDKs de todos os projetos nem instala outro JDK Windows para isso.
 
-A política é instalar somente VS Code e IntelliJ como IDEs Windows. O Android Studio permanece no Arch, aberto por WSLg. Visual Studio **Build Tools** é a toolchain do compilador nativo e não acrescenta a IDE completa. O setup Windows não instala OpenCode, Gemini CLI, Antigravity CLI, AgentMemory ou iii-engine. O Codex Windows já ativo foi preservado por solicitação expressa; os fluxos novos de agentes usam o Arch.
+A política é instalar somente VS Code e IntelliJ como IDEs Windows. O Android Studio permanece no Arch, aberto por WSLg. O setup Windows não instala OpenCode, Gemini CLI, Antigravity CLI, AgentMemory ou iii-engine. O Codex Windows já ativo foi preservado por solicitação expressa; os fluxos novos de agentes usam o Arch.
 
 Python/uv, JDKs de desenvolvimento, Gradle e SDK/NDK/emulador Android pertencem ao Arch. O Windows mantém `platform-tools` para o servidor ADB e os drivers USB necessários. O IntelliJ usa seu runtime Java incluído.
 
-Git, Node/npm, Rust MSVC, .NET, Build Tools/Windows SDK, WebView2, FFmpeg/FFprobe, GStreamer, CMake, LLVM e llama-server continuam necessários para os builds Windows descritos abaixo. Os runtimes Visual C++ de gerações e arquiteturas diferentes atendem aplicativos distintos; não são duplicatas a apagar. Bitwarden, compactadores, VLC, YouTube Music e os utilitários de drivers fazem parte da seleção de aplicativos do usuário. O setup não reinstala Antigravity IDE, GlazeWM ou Zebar.
+Node/npm permanece disponível no Windows para ferramentas locais; a compilação Rust para Windows é feita no Arch. O WebView2 é mantido para execução de aplicativos Tauri. Os runtimes Visual C++ de gerações e arquiteturas diferentes atendem aplicativos distintos; não são duplicatas a apagar. Bitwarden, compactadores, VLC, YouTube Music e os utilitários de drivers fazem parte da seleção de aplicativos do usuário. O setup não reinstala Antigravity IDE, GlazeWM ou Zebar.
 
 ### Painel de Controle NVIDIA
 
@@ -439,13 +447,11 @@ Get-AppxPackage -Name NVIDIACorp.NVIDIAControlPanel | Select-Object Name, Versio
 
 Abra **Painel de Controle da NVIDIA** pelo menu Iniciar. A execução de `windows/setup-apps.ps1`, também chamado pelo setup principal, reproduz essa instalação automaticamente.
 
-### NVIDIA App, CUDA e drivers
+### NVIDIA App e drivers
 
-O script identifica GPUs por `Win32_VideoController` e consulta `nvidia-smi --query-gpu=compute_cap`. O NVIDIA App é omitido quando todos os modelos NVIDIA encontrados estiverem na lista `NvidiaAppUnsupportedModels`; a MX110 foi recusada pelo instalador oficial com `CheckIfGPUIsSupported`, e não se força a instalação nesse hardware. GPUs com capacidade de 5.0 até abaixo de 7.5 usam o CUDA 12.9 declarado no catálogo; GPUs a partir de 7.5 usam o pacote estável do catálogo sem número fixado. Hardware anterior a Maxwell ou ausência de driver/consulta válida interrompe essa etapa com mensagem.
+O script identifica GPUs por `Win32_VideoController`. O NVIDIA App é omitido quando todos os modelos encontrados estão na lista `NvidiaAppUnsupportedModels`; a MX110 foi recusada pelo instalador oficial. O Painel de Controle NVIDIA continua sendo instalado quando necessário. A escolha e atualização dos drivers permanecem nos aplicativos oficiais.
 
-A MX110 desta máquina tem capacidade 5.0 (Maxwell). O CUDA 13 removeu compilação e bibliotecas para Maxwell, Pascal e Volta; a [matriz oficial](https://docs.nvidia.com/datacenter/tesla/drivers/latest/cuda-toolkit-driver-and-architecture-matrix.html) justifica usar 12.x nesse hardware. O instalador verifica `nvcc.exe` em `v12.9`, define `CUDA_PATH` do usuário para esse diretório e acrescenta seu `bin` ao PATH. A instalação legada seleciona os componentes `nvcc`, `cudart`, Thrust e as bibliotecas cuBLAS, cuFFT, cuRAND, cuSOLVER, cuSPARSE, NPP, nvJPEG, NVRTC, nvJitLink e NVTX, incluindo os pacotes de desenvolvimento declarados no catálogo. Usa a [seleção silenciosa oficial](https://docs.nvidia.com/cuda/archive/12.9.1/cuda-installation-guide-microsoft-windows/index.html#install-the-cuda-software) e omite `Display.Driver`, preservando o driver gráfico. Verifique também a compatibilidade da versão MSVC com o toolkit: encontrar `nvcc` não comprova a compilação de um projeto CUDA.
-
-O driver é Windows. Instalar CUDA Windows não instala um compilador CUDA Linux no Arch. A [documentação CUDA no WSL](https://docs.nvidia.com/cuda/wsl-user-guide/index.html) exige hardware suportado e descreve suporte a partir de Pascal; a MX110 não permite presumir suporte oficial de computação CUDA no WSL. Não instale um driver NVIDIA Linux convencional dentro do WSL para tentar corrigir isso. O setup instala os utilitários Intel/NVIDIA; escolha e instalação de atualizações de drivers continuam nos aplicativos oficiais, sem atualização forçada pelo dotfiles.
+O setup não instala o CUDA Toolkit Windows. Aplicativos que necessitem de bibliotecas CUDA devem fornecer seus próprios runtimes compatíveis; a disponibilidade de computação CUDA no WSL depende da GPU e do driver.
 
 ### YouTube Music Desktop pelo winget
 
@@ -458,24 +464,13 @@ winget list --id Ytmdesktop.Ytmdesktop --exact --source winget
 
 Abra **YouTube Music Desktop App** pelo menu Iniciar e faça login na sua conta. A reprodução usa esse pacote desktop; a PWA e a confirmação de instalação do navegador deixaram de fazer parte do processo.
 
-## Desktop Windows e AutoCut
+## Desktop Windows e aplicações Rust
 
-Execute `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\setup-desktop.ps1` para reaplicar apenas os pré-requisitos nativos. O script usa `winget` para os componentes disponíveis no catálogo, instala o pacote oficial do GStreamer com runtime e arquivos de desenvolvimento e valida os executáveis e bibliotecas necessários. É preciso reabrir o terminal após alterações no `PATH` de usuário.
+`windows/setup-apps.ps1` assegura VS Code com extensão WSL, Node.js LTS com npm, runtime WebView2 e runtimes Visual C++. Node.js permanece disponível para as outras ferramentas Windows.
 
-| Componente | Uso e verificação |
-| --- | --- |
-| VS Code estável e extensão WSL | GUI no Windows e VS Code Server no Arch. O setup instala `Microsoft.VisualStudioCode` via winget se ausente e `ms-vscode-remote.remote-wsl` via CLI do VS Code. |
-| Git, Node.js LTS ≥ 20.19 e npm | Instalação, build e testes do frontend. Confira com `git --version`, `node --version` e `npm --version`. |
-| Rust via rustup | Toolchain estável `x86_64-pc-windows-msvc` e componente `rustfmt` para o backend Tauri. Confira com `rustup show` e `cargo fmt --version`. |
-| Visual Studio Build Tools e WebView2 | Workload **Desktop development with C++** e runtime WebView2 exigidos pelo Tauri no Windows. O instalador usa o `vswhere` para validar a workload. |
-| FFmpeg e FFprobe | Áudio, metadados, proxies e renderização. Confira com `ffmpeg -version` e `ffprobe -version`. |
-| GStreamer MSVC x64 | Instalador oficial da versão declarada em `windows/versions.psd1` com `/TYPE=devel`: runtime, cabeçalhos, GES e plugins. O script verifica `glshader`, `pitch` e `wasapi2sink` com `gst-inspect-1.0` e adiciona o diretório `bin` ao `PATH` do usuário. |
-| CMake e LLVM/Clang | Compilação do `whisper-rs`; `LIBCLANG_PATH` aponta para o diretório de `libclang.dll`. |
-| `llama-server` | Servidor de IA local no `PATH`, usado quando a análise local está ativada. |
+A toolchain Rust, compiladores, SDKs de desenvolvimento e bibliotecas nativas para cross-compilation são preparados no Arch, conforme o [guia de cross-compilation](docs/windows-cross.md). O SDK .NET e as instalações independentes de GStreamer, FFmpeg e llama.cpp não fazem parte do setup Windows. Os runtimes específicos de cada aplicativo devem ser fornecidos pelo próprio projeto ou pacote.
 
-O GStreamer é um pacote MSVC x64 oficial específico; o instalador não supõe que toda distribuição do GStreamer contenha GES e esses plugins. Ele verifica o executável no diretório oficial da instalação. Se outra instalação de `gst-inspect-1.0` aparecer antes no PATH global, use o executável dentro de `GSTREAMER_1_0_ROOT_MSVC_X86_64`; o runner Windows prioriza esse pacote no processo de build. Os demais componentes também têm verificações próprias e mensagens de erro na instalação.
-
-O setup de aplicativos fornece .NET 10 SDK e garante Platform Tools quando ADB estiver ausente. O Windows mantém o servidor ADB e o dispositivo USB; o Arch recebe o SDK Android Linux.
+O runner `validate-windows` continua disponível para executar a validação definida pelo projeto no Windows. Um projeto que ainda exija compiladores ou SDKs Windows terá que ajustar sua validação ou fornecê-los separadamente; o sucesso de `windows-sync` não comprova um build ou execução.
 
 ## Supabase local
 
@@ -567,8 +562,6 @@ Faça as verificações na plataforma indicada. Elas conferem o ambiente instala
 | Windows | `adb devices -l` | Servidor ADB ativo; o telefone aparece se conectado e autorizado. |
 | Windows com NVIDIA | `Get-AppxPackage -Name NVIDIACorp.NVIDIAControlPanel` | Pacote do Painel de Controle registrado na conta atual. |
 | Windows com NVIDIA | `Get-Service NVDisplay.ContainerLocalSystem` e `nvidia-smi` | Serviço do driver em execução e GPU identificada. |
-| Windows com MX110 | `Get-Command nvcc.exe` e `nvcc --version` | CUDA 12.9 selecionado; essa consulta não substitui um teste real de compilação CUDA. |
-| Windows | Execute `& "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\bin\gst-inspect-1.0.exe" --exists glshader` (repita para `pitch` e `wasapi2sink`). | Cada comando retorna código 0 na instalação MSVC x64. |
 | Arch | `systemctl status docker`, `docker compose version` | Docker ativo e Compose disponível. |
 | Arch | `node --version`, `java -version`, `gradle --version` | Ferramentas de build Linux disponíveis. |
 | Arch | `paru --version`, `nvim --version`, `echo $SHELL` | Paru, Neovim e Zsh disponíveis. |
@@ -641,9 +634,6 @@ O script mantém um `sleep infinity` em primeiro plano no WSL. Na recuperação 
 | Aplicativos Windows | Instalação estável do catálogo quando ausentes; existentes são preservados. Use atualização seletiva por ID quando desejar atualizar. |
 | Painel de Controle NVIDIA | Pacote da Microsoft Store, sem versão fixada; a instalação existente da conta é preservada. Atualize pela Store ou pelo winget com a fonte `msstore`. |
 | ADB Windows | `Google.PlatformTools` quando ausente; instalações existentes são preservadas pelo caminho do executável. Atualize pelo canal que forneceu essa instalação e confira `Get-Command adb.exe -All`. |
-| GStreamer Windows | Instalador oficial 1.28.6, definido em `versions.psd1`. Uma instalação com os arquivos exigidos já presentes pode ser reaproveitada. |
-| CUDA Windows | Último pacote estável em GPUs atuais; versão 12.9 para Maxwell/Pascal/Volta por compatibilidade. |
-| Rust Windows | Toolchain `stable-x86_64-pc-windows-msvc` assegurada se ausente; `rustup update stable-x86_64-pc-windows-msvc` atualiza uma instalação existente. |
 | LazyVim/Oh My Zsh | Os instaladores preservam instalações reconhecidas. Atualizações de plugins são feitas pelos respectivos gerenciadores. |
 
 No Windows, exemplos de atualizações seletivas:
@@ -651,13 +641,12 @@ No Windows, exemplos de atualizações seletivas:
 ~~~powershell
 winget upgrade --id Bitwarden.Bitwarden --exact --source winget
 winget upgrade --id JetBrains.IntelliJIDEA --exact --source winget
-winget upgrade --id Microsoft.DotNet.SDK.10 --exact --source winget
 winget upgrade --id Ytmdesktop.Ytmdesktop --exact --source winget
 winget upgrade --id 9NF8H0H7WMLT --exact --source msstore
 choco upgrade chocolatey --yes
 ~~~
 
-Use a fonte `msstore` para o Painel de Controle NVIDIA e, em GPUs compatíveis, para o NVIDIA App. Para Platform Tools instaladas pelo winget, use `winget upgrade --id Google.PlatformTools --exact --source winget`; uma cópia preservada de outra origem pode não estar registrada sob esse ID. O Chocolatey é disponibilizado para uso no Windows; o setup usa winget para os aplicativos catalogados, evitando cadastrar o mesmo programa em dois gerenciadores. Atualize seletivamente: o CUDA legado da MX110 deve permanecer em uma versão compatível.
+Use a fonte `msstore` para o Painel de Controle NVIDIA e, em GPUs compatíveis, para o NVIDIA App. Para Platform Tools instaladas pelo winget, use `winget upgrade --id Google.PlatformTools --exact --source winget`; uma cópia preservada de outra origem pode não estar registrada sob esse ID. O Chocolatey é disponibilizado para uso no Windows; o setup usa winget para os aplicativos catalogados, evitando cadastrar o mesmo programa em dois gerenciadores.
 
 Para atualizar o WSL, execute `wsl --update` no Windows e reinicie a distribuição após salvar o trabalho. Reaplicar `windows/setup.ps1` também reaplica os modelos; não é apenas um comando de atualização de pacotes.
 
@@ -678,7 +667,7 @@ Para atualizar o WSL, execute `wsl --update` no Windows e reinicie a distribuiç
 
 O perfil PowerShell copiado pelo setup pertence ao perfil **Windows PowerShell** do Terminal, que o executa com `-File`. Ele não substitui automaticamente todos os arquivos `$PROFILE` nem configura todos os hosts PowerShell. Os perfis adicionais do JSON incluem cmd, Azure Cloud Shell, Developer Command Prompt/PowerShell das versões VS e Arch; a disponibilidade depende dos programas instalados. O perfil Arch tem GUID do modelo: em outra instalação, confira o perfil WSL descoberto pelo Terminal.
 
-O Starship usa o tema padrão nos dois shells; não há um `starship.toml` personalizado neste repositório. Oh My Zsh oferece plugins com `ZSH_THEME=""`. O Oh My Posh, se necessário para instalar a fonte, não é inicializado como prompt. O desenho do prompt, a paleta ANSI do Terminal e o GTK das janelas WSLg são camadas diferentes.
+O Starship usa o tema padrão nos dois shells. No perfil Windows PowerShell, [starship.toml](windows/terminal/starship.toml) aumenta o limite dos comandos para 3 segundos, reduzindo avisos quando o Git demora a iniciar. O perfil preserva uma configuração existente em `STARSHIP_CONFIG` ou em `~/.config/starship.toml` (ou `$env:XDG_CONFIG_HOME/starship.toml`); nesse caso, ajuste `command_timeout = 3000` no próprio arquivo, antes das seções, se o aviso persistir. Oh My Zsh oferece plugins com `ZSH_THEME=""`. O Oh My Posh, se necessário para instalar a fonte, não é inicializado como prompt. O desenho do prompt, a paleta ANSI do Terminal e o GTK das janelas WSLg são camadas diferentes.
 
 ### Paleta completa do Terminal
 
@@ -716,8 +705,6 @@ Fundo `#002b36`; texto `#839496`; seleção `#073642`; cursor `#859900`. O PSRea
 | Controles GTK ou ícone incorretos | Reaplique `--android-studio`, confira as duas opções VM e o `<app_id>.desktop`, e reabra a IDE. |
 | Target Windows recusado | Confirme origem diretamente em `~/dev`, nome ASCII, marcador e ausência de junções. Não force o runner a usar uma pasta pertencente a outro projeto. |
 | Build Windows falha | Confira o código de saída do validador do projeto e suas dependências Windows; sucesso de sincronização não comprova sucesso de build. |
-| Plugin GStreamer não encontrado | Use o binário da instalação correta: Arch com `pulsesink`; Windows MSVC x64 com `wasapi2sink`. Confira também GES via pkg-config ou os arquivos de desenvolvimento correspondentes. |
-| CUDA não atende a GPU | Confira capacidade, driver, versão do toolkit e `CUDA_PATH`. Para a MX110, use o toolkit Windows 12.x compatível. |
 | Painel de Controle NVIDIA ausente | Confira o driver, o serviço `NVDisplay.ContainerLocalSystem`, a conta atual e `Get-AppxPackage -Name NVIDIACorp.NVIDIAControlPanel`; reaplique `setup-apps.ps1` ou o comando winget da seção do painel. |
 | NVIDIA App recusado na MX110 | O instalador oficial rejeitou essa GPU; o catálogo omite o NVIDIA App nesse modelo. O Painel de Controle tem uma etapa própria e continua incluído. |
 | Fonte `msstore` indisponível | Confira `winget source list` e `winget source update`. Use a mesma conta Windows do ambiente e examine o erro apresentado pelo winget antes de reaplicar a etapa. |
