@@ -20,19 +20,11 @@ base() {
         git docker docker-compose docker-buildx nodejs-lts-krypton npm pnpm yarn rust \
         jdk17-openjdk jdk21-openjdk kotlin gradle android-tools unzip \
         python python-pip python-virtualenv ruby ruby-bundler ruby-stdlib \
-        cmake ninja clang llvm ffmpeg gstreamer gst-plugins-base gst-plugins-good \
-        gst-plugins-bad gst-plugins-ugly gst-libav gst-editing-services soundtouch \
+        cmake ninja clang llvm ffmpeg \
         openssl readline zlib libyaml libffi gdbm ncurses bzip2 sqlite xz tk libxml2 libxslt \
         base-devel zsh starship curl wget ripgrep jq fzf zoxide github-cli mise usage
     # Arch supplies ELF binaries, headers and .so libraries through these packages.
     /usr/bin/python -c 'import ctypes; ctypes.CDLL("libclang.so")'
-    pkg-config --exists gstreamer-1.0 gstreamer-gl-1.0 gst-editing-services-1.0
-    for plugin in glshader pitch pulsesink; do
-        gst-inspect-1.0 --exists "$plugin" || {
-            printf 'Missing Linux GStreamer plugin: %s\n' "$plugin" >&2
-            exit 1
-        }
-    done
     if [[ $(ps -p 1 -o comm=) != systemd ]]; then
         printf 'Enable systemd in /etc/wsl.conf and restart WSL before Docker.\n' >&2
         exit 1
