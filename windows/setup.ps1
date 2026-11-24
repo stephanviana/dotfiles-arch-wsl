@@ -65,7 +65,7 @@ if (Test-Path -LiteralPath $terminalSetup) {
     Write-Warning 'Execute windows/setup-terminal.ps1 a partir do checkout para configurar o Windows Terminal.'
 }
 
-# Install the manual WSLg repair and Windows runner without a logon task.
+# Install only the manual WSLg repair, without a logon task.
 $runtimeDir = Join-Path $env:LOCALAPPDATA 'dotfiles-wsl-arch'
 $keepaliveSource = Join-Path $PSScriptRoot 'keepalive.ps1'
 if (-not (Test-Path -LiteralPath $keepaliveSource)) {
@@ -74,11 +74,6 @@ if (-not (Test-Path -LiteralPath $keepaliveSource)) {
 New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
 $keepalivePath = Join-Path $runtimeDir 'keepalive.ps1'
 Copy-Item -LiteralPath $keepaliveSource -Destination $keepalivePath -Force
-$validationSource = Join-Path $PSScriptRoot 'validate-project.ps1'
-if (-not (Test-Path -LiteralPath $validationSource)) {
-    throw 'Execute windows/setup.ps1 a partir do checkout completo (validate-project.ps1 necessario).'
-}
-Copy-Item -LiteralPath $validationSource -Destination (Join-Path $runtimeDir 'validate-project.ps1') -Force
 Write-Host 'Arch sob demanda: abra um terminal ou aplicativo WSL quando precisar.'
 Write-Host 'Docker e AgentMemory ficam disponiveis somente enquanto o Arch estiver ativo.'
 Write-Host 'Reparo grafico manual: windows/keepalive.ps1 -RepairOnly (pode reiniciar o WSL).'

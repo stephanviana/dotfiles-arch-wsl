@@ -40,7 +40,6 @@ base() {
     bash "$tools_dir/mise.sh"
     bash "$tools_dir/interop.sh"
     bash "$tools_dir/vscode-wsl.sh"
-    bash "$tools_dir/windows-validation.sh" --install
     printf 'Base toolchain and Docker installed.\n'
 }
 
@@ -58,7 +57,6 @@ case "$stage" in
     --paru) bash "$tools_dir/paru.sh" ;;
     --lazyvim) bash "$tools_dir/lazyvim.sh" ;;
     --vscode) bash "$tools_dir/vscode-wsl.sh" ;;
-    --windows-runner) bash "$tools_dir/windows-validation.sh" --install ;;
     --windows-cross) bash "$tools_dir/windows-cross.sh" install ;;
     --android-studio)
         bash "$tools_dir/android-sdk.sh"
@@ -77,5 +75,5 @@ case "$stage" in
         bash "$tools_dir/agentmemory.sh"
         bash "$tools_dir/ai-agents.sh"
         ;;
-    *) printf 'Usage: %s [--base|--mise|--paru|--lazyvim|--vscode|--windows-runner|--windows-cross|--android|--android-studio|--supabase|--agentmemory|--agents|--all]\n' "$0" >&2; exit 2 ;;
+    *) printf 'Usage: %s [--base|--mise|--paru|--lazyvim|--vscode|--windows-cross|--android|--android-studio|--supabase|--agentmemory|--agents|--all]\n' "$0" >&2; exit 2 ;;
 esac

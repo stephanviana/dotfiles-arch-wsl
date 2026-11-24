@@ -149,7 +149,7 @@ try {
     $env:USERPROFILE = Join-Path $tempRoot 'user'
     $env:LOCALAPPDATA = Join-Path $tempRoot 'local'
     $null = New-Item -ItemType Directory -Path $env:USERPROFILE
-    foreach ($file in @('setup.ps1', 'disable-wsl-logon-tasks.ps1', 'keepalive.ps1', 'validate-project.ps1', '.wslconfig')) {
+    foreach ($file in @('setup.ps1', 'disable-wsl-logon-tasks.ps1', 'keepalive.ps1', '.wslconfig')) {
         Copy-Item -LiteralPath (Join-Path $windowsDir $file) -Destination $tempRoot
     }
     Set-Content -LiteralPath (Join-Path $tempRoot 'setup-apps.ps1') -Value '$global:DotfilesStartupTestState.appsCalled = $true'
@@ -167,9 +167,10 @@ try {
     $configPath = Join-Path $env:USERPROFILE '.wslconfig'
     Assert-True (Test-Path -LiteralPath $configPath) 'Setup creates missing config without shutdown'
     $configContent = [IO.File]::ReadAllText($configPath)
-    foreach ($file in @('keepalive.ps1', 'validate-project.ps1')) {
+    foreach ($file in @('keepalive.ps1')) {
         Assert-True (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA "dotfiles-wsl-arch\$file")) "Setup installs $file"
     }
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'dotfiles-wsl-arch\validate-project.ps1'))) 'Setup does not install the retired Windows synchronization runner'
     & (Join-Path $tempRoot 'setup.ps1')
     Assert-True ($global:DotfilesStartupTestState.disabled.Count -eq 2) 'Setup reapplication does not reactivate tasks'
     Assert-True ([IO.File]::ReadAllText($configPath) -eq $configContent) 'Setup preserves existing config'
