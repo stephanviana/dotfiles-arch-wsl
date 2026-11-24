@@ -23,6 +23,7 @@ base() {
         cmake ninja clang llvm ffmpeg \
         openssl readline zlib libyaml libffi gdbm ncurses bzip2 sqlite xz tk libxml2 libxslt \
         base-devel zsh starship curl wget ripgrep jq fzf zoxide github-cli mise usage
+    gh --version
     # Arch supplies ELF binaries, headers and .so libraries through these packages.
     /usr/bin/python -c 'import ctypes; ctypes.CDLL("libclang.so")'
     if [[ $(ps -p 1 -o comm=) != systemd ]]; then
