@@ -1,3 +1,43 @@
-#!/bin/sh
-# Always use the Windows ADB server in WSL mirrored mode.
+#!/usr/bin/env bash
+# dotfiles-wsl-arch: Windows ADB bridge client v2
+set -euo pipefail
+
+args=("$@")
+command=''
+for ((i = 0; i < ${#args[@]}; i++)); do
+    option=${args[i]}
+    case "$option" in
+        -s|-t|-H|-P)
+            if ((i + 1 >= ${#args[@]})); then
+                printf 'ADB: %s requer um valor.\n' "$option" >&2; exit 2
+            fi
+            ((i += 1))
+            value=${args[i]}
+            if [[ $option == -H && $value != 127.0.0.1 && $value != localhost ]] || \
+               [[ $option == -P && $value != 5037 ]]; then
+                printf 'ADB: esta ponte usa somente 127.0.0.1:5037.\n' >&2; exit 2
+            fi ;;
+        -d|-e|--exit-on-write-error) ;;
+        -a|-L*|server|nodaemon|fork-server)
+            printf 'ADB: este comando pode criar um servidor Linux; use o servidor Windows.\n' >&2; exit 2 ;;
+        -*)
+            case "$option" in
+                -h|--help|--version) command=help; break ;;
+                *) printf 'ADB: opcao global nao suportada pela ponte: %s\n' "$option" >&2; exit 2 ;;
+            esac ;;
+        *) command=$option; break ;;
+    esac
+done
+
+case "$command" in
+    ''|help|version|keygen) ;;
+    kill-server)
+        if timeout 5 /usr/bin/adb -H 127.0.0.1 -P 5037 "$@"; then exit 0; else result=$?; fi
+        if [[ $result == 124 ]]; then
+            printf 'ADB: encerramento excedeu 5s; servidor parado ou ponte inacessivel. Nenhum servidor foi iniciado.\n' >&2
+        fi
+        exit "$result" ;;
+    *) "${HOME}/.local/bin/adb-bridge" ensure ;;
+esac
+if [[ $command == start-server ]]; then exit 0; fi
 exec /usr/bin/adb -H 127.0.0.1 -P 5037 "$@"

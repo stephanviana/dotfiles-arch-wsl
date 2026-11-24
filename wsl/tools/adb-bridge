@@ -1,0 +1,107 @@
+#!/usr/bin/python
+"""Probe ADB without starting/killing a daemon; start only the Windows server."""
+import socket
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HOST, PORT = "127.0.0.1", 5037
+
+
+def read_exact(stream, size):
+    result = b""
+    while len(result) < size:
+        part = stream.recv(size - len(result))
+        if not part:
+            raise OSError("ADB fechou a conexao antes de responder")
+        result += part
+    return result
+
+
+def query(service):
+    request = service.encode("ascii")
+    with socket.create_connection((HOST, PORT), timeout=1) as stream:
+        stream.settimeout(1)
+        stream.sendall(f"{len(request):04x}".encode("ascii") + request)
+        status = read_exact(stream, 4)
+        if status not in (b"OKAY", b"FAIL"):
+            raise OSError("Porta 5037 respondeu fora do protocolo ADB")
+        size = int(read_exact(stream, 4), 16)
+        reply = read_exact(stream, size).decode("utf-8", errors="replace")
+        if status == b"FAIL":
+            raise OSError(f"ADB recusou {service}: {reply}")
+        return reply
+
+
+def probe():
+    version = query("host:version")
+    if len(version) != 4 or int(version, 16) != 41:
+        raise OSError(f"Protocolo ADB inesperado: {version!r}; servidor preservado")
+
+
+def ensure():
+    try:
+        probe()
+        return
+    except (OSError, ValueError) as exc:
+        print(f"Ponte ADB indisponivel ({exc}); consultando o Windows...", file=sys.stderr)
+    script = Path(__file__).resolve().with_name("ensure-adb-server.ps1")
+    if not script.is_file():
+        script = Path(__file__).resolve().parent.parent / "lib/dotfiles-wsl-arch/ensure-adb-server.ps1"
+    if not script.is_file():
+        script = Path(__file__).resolve().parents[2] / "windows/ensure-adb-server.ps1"
+    if not script.is_file():
+        raise OSError("Helper Windows ausente; reaplique wsl/tools/android.sh")
+    windows_path = subprocess.run(["/usr/bin/wslpath", "-m", str(script)],
+                                  capture_output=True, text=True, timeout=2, check=True).stdout.strip()
+    result = subprocess.run(
+        ["/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe", "-NoProfile",
+         "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", windows_path],
+        stdin=subprocess.DEVNULL, capture_output=True, timeout=16,
+    )
+    message = (result.stdout + result.stderr).decode("utf-8", errors="replace").strip()
+    if message:
+        print(message, file=sys.stderr)
+    if result.returncode:
+        raise OSError("Windows nao disponibilizou o ADB; servidor existente preservado")
+    deadline = time.monotonic() + 4
+    while True:
+        try:
+            probe()
+            return
+        except (OSError, ValueError) as exc:
+            if time.monotonic() >= deadline:
+                raise OSError("ADB responde no Windows, mas a ponte WSL falhou; confira rede mirrored e firewall") from exc
+            time.sleep(0.2)
+
+
+def main():
+    command = sys.argv[1:] or ["ensure"]
+    if command not in (["ensure"], ["status"]):
+        print("Uso: adb-bridge [ensure|status] (status nunca inicia o servidor)", file=sys.stderr)
+        return 2
+    try:
+        if command == ["ensure"]:
+            ensure()
+        else:
+            probe()
+            devices = query("host:devices-l").strip()
+            print("Ponte ADB ativa: tcp:127.0.0.1:5037")
+            if not devices:
+                print("Nenhum dispositivo listado pelo servidor Windows; confira USB, depuracao e driver.")
+            else:
+                print(devices)
+                states = {fields[1] for line in devices.splitlines() if len(fields := line.split()) >= 2}
+                if "unauthorized" in states:
+                    print("Autorizacao pendente: desbloqueie o telefone e aceite a chave RSA.")
+                if "offline" in states:
+                    print("Dispositivo offline: confira cabo/USB e depuracao; servidor nao reiniciado.")
+        return 0
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        print(f"ADB: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
