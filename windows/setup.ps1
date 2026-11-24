@@ -5,6 +5,12 @@ $ErrorActionPreference = 'Stop'
 Write-Host 'Dotfiles Windows + Arch Linux (WSL 2)'
 Write-Host 'github.com/stephanviana/dotfiles-wsl-arch'
 
+$logonMigration = Join-Path $PSScriptRoot 'disable-wsl-logon-tasks.ps1'
+if (-not (Test-Path -LiteralPath $logonMigration)) {
+    throw 'Execute windows/setup.ps1 a partir do checkout completo (disable-wsl-logon-tasks.ps1 necessario).'
+}
+& $logonMigration
+
 $computer = Get-CimInstance Win32_ComputerSystem
 $ramGiB = [math]::Round($computer.TotalPhysicalMemory / 1GB, 1)
 $logicalCpus = [int]$computer.NumberOfLogicalProcessors
@@ -39,8 +45,7 @@ if (Test-Path -LiteralPath $configPath) {
             Set-Content -LiteralPath $configPath -Encoding Ascii
     }
     Write-Host "Criado: $configPath"
-    wsl.exe --shutdown
-    if ($LASTEXITCODE -ne 0) { throw 'Falha ao reiniciar o WSL.' }
+    Write-Warning 'A nova .wslconfig sera aplicada no proximo inicio do WSL. As sessoes atuais foram preservadas.'
 }
 
 Write-Host 'ADB: servidor e dispositivo USB no Windows; cliente Arch via TCP bridge 127.0.0.1:5037.'
@@ -60,8 +65,7 @@ if (Test-Path -LiteralPath $terminalSetup) {
     Write-Warning 'Execute windows/setup-terminal.ps1 a partir do checkout para configurar o Windows Terminal.'
 }
 
-# A foreground WSL process keeps systemd user services available to Windows apps.
-$taskName = 'ArchWSLKeepAlive'
+# Install the manual WSLg repair and Windows runner without a logon task.
 $runtimeDir = Join-Path $env:LOCALAPPDATA 'dotfiles-wsl-arch'
 $keepaliveSource = Join-Path $PSScriptRoot 'keepalive.ps1'
 if (-not (Test-Path -LiteralPath $keepaliveSource)) {
@@ -75,31 +79,6 @@ if (-not (Test-Path -LiteralPath $validationSource)) {
     throw 'Execute windows/setup.ps1 a partir do checkout completo (validate-project.ps1 necessario).'
 }
 Copy-Item -LiteralPath $validationSource -Destination (Join-Path $runtimeDir 'validate-project.ps1') -Force
-$taskExecutable = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$taskArguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}"' -f $keepalivePath
-$action = New-ScheduledTaskAction -Execute $taskExecutable -Argument $taskArguments
-$taskSettings = New-ScheduledTaskSettingsSet -Hidden -AllowStartIfOnBatteries `
-    -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
-$existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-if (-not $existingTask) {
-    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-    $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" `
-        -LogonType Interactive -RunLevel Limited
-    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
-        -Principal $principal -Settings $taskSettings | Out-Null
-    Write-Host "Tarefa $taskName criada para manter o Arch ativo apos o login."
-} else {
-    $matchingAction = @($existingTask.Actions | Where-Object {
-        $_.Execute -eq $taskExecutable -and $_.Arguments -eq $taskArguments
-    }).Count -eq 1
-    $legacyAction = @($existingTask.Actions | Where-Object {
-        $_.Execute -eq (Join-Path $env:WINDIR 'System32\wsl.exe') -and
-        $_.Arguments -eq '-d archlinux --exec /usr/bin/sleep infinity'
-    }).Count -eq 1
-    if ($matchingAction -or $legacyAction) {
-        Set-ScheduledTask -TaskName $taskName -Action $action -Settings $taskSettings | Out-Null
-        Write-Host "Tarefa $taskName atualizada com recuperacao do WSLg e sem limite de execucao."
-    } else {
-        Write-Host "Tarefa $taskName existente; preservando."
-    }
-}
+Write-Host 'Arch sob demanda: abra um terminal ou aplicativo WSL quando precisar.'
+Write-Host 'Docker e AgentMemory ficam disponiveis somente enquanto o Arch estiver ativo.'
+Write-Host 'Reparo grafico manual: windows/keepalive.ps1 -RepairOnly (pode reiniciar o WSL).'
