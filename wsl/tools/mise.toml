@@ -1,5 +1,6 @@
 [tools]
 node = "latest"
+go = "latest"
 ruby = "latest"
 kotlin = "latest"
 python = "latest"

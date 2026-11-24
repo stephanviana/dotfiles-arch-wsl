@@ -30,6 +30,7 @@ mise -C "$temp_dir" exec -- python -m pip install --upgrade pip
 mise reshim
 
 mise -C "$temp_dir" exec -- node --version
+mise -C "$temp_dir" exec -- go version
 mise -C "$temp_dir" exec -- ruby --version
 mise -C "$temp_dir" exec -- kotlin -version
 mise -C "$temp_dir" exec -- python --version
