@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export ANDROID_HOME="$HOME/Android/Sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export ADB_SERVER_SOCKET='tcp:127.0.0.1:5037'
+export GTK_THEME="${GTK_THEME:-Adwaita:dark}"
+if [[ ! -d /mnt/wslg ]] || [[ -z ${DISPLAY:-} && -z ${WAYLAND_DISPLAY:-} ]]; then
+    printf 'Android Studio needs an active WSLg display.\n' >&2
+    exit 1
+fi
+"$HOME/.local/bin/adb-bridge" ensure
+exec /usr/bin/android-studio "$@"
